@@ -1,19 +1,22 @@
 import os
 import time
 import json
+import argparse
 from dotenv import load_dotenv
+from loguru import logger
 from g2adapter import G2Adapter
 from redditadapter import RedditAdapter
 from twitteradapter import TwitterAdapter
 from youtubeadapter import YouTubeAdapter
 from transcriptprocessor import TranscriptProcessor
 
+
 def load_env():
     env = os.environ.get("APP_ENV", "")
     filepath = f"./configs/.{env}.env"
     load_dotenv(filepath)
-
     return os.environ
+
 
 class MultiSourceScraper:
     def __init__(self):
@@ -26,14 +29,21 @@ class MultiSourceScraper:
         results = {}
         for name, adapter in self.adapters.items():
             try:
+                logger.info(f"Starting scrape for {name}")
                 results[name] = adapter.scrape(query, max_results)
+                logger.info(f"Finished scrape for {name}")
             except Exception as e:
-                print(f"Error scraping {name}: {str(e)}")
+                logger.error(f"Error scraping {name}: {str(e)}")
                 results[name] = []
         return results
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Multi-source scraper")
+    parser.add_argument('--query', type=str, required=True, help="Search query")
+    parser.add_argument('--max_results', type=int, default=100, help="Maximum number of results to scrape")
+    args = parser.parse_args()
+
     configs = load_env()
 
     redditConfigs = {
@@ -43,23 +53,36 @@ if __name__ == '__main__':
         "threshold_criteria": None,
     }
 
-    scraper = MultiSourceScraper()
-    # scraper.add_adapter('twitter', TwitterAdapter('aozAEjJt2slPLEiHNgRMGCXS7', 'e85zRAxwKkvaY2zbAl9JiHtGhyXH3YNZh6Zfkw0cNMWQPYIJq4', \
-    #                                               '588918106-vVnToT0wu262rehKwXhWqqGAhvBnPIkzJbBgOBcI', 'EqiN6G4Y2tT3YkTcO0iv0by5zK8dRCddWmTmvsOl1KIVc'))
-    scraper.add_adapter('reddit', RedditAdapter(**redditConfigs))
-    # scraper.add_adapter('g2', G2Adapter())
+    youtubeConfigs = {
+        "api_key": configs.get("YOUTUBE_API_KEY"),
+        "threshold_criteria": None,
+    }
 
-    # scraper.add_adapter('youtube', YouTubeAdapter('AIzaSyAayConHIWS_LABo1Dz0zQv31iO96dAMlQ'))
+    twitterConfigs = {
+        "api_key": configs.get("TWITTER_API_KEY"),
+        "api_secret": configs.get("TWITTER_API_SECRET"),
+        "access_token": configs.get("TWITTER_ACCESS_TOKEN"),
+        "access_token_secret": configs.get("TWITTER_ACCESS_TOKEN_SECRET"),
+        "threshold_criteria": None,
+    }
+
+    scraper = MultiSourceScraper()
+    scraper.add_adapter('reddit', RedditAdapter(**redditConfigs))
+    scraper.add_adapter('twitter', TwitterAdapter(**twitterConfigs))
+    # scraper.add_adapter('g2', G2Adapter())
+    scraper.add_adapter('youtube', YouTubeAdapter(**youtubeConfigs))
 
     start_time = time.time()
-    results = scraper.scrape('docker', max_results=10)
+    logger.info(f"Starting scraping with query: {args.query} and max_results: {args.max_results}")
+    results = scraper.scrape(args.query, max_results=args.max_results)
 
     openai_key = configs.get("OPENAI_API_KEY")
 
-    transcriptProcessor = TranscriptProcessor(openai_key, "reddit", results['reddit'])
-
-    transcriptProcessor.process_transcripts()
+    if 'youtube' in results:
+        logger.info("Starting transcript processing for YouTube results")
+        transcriptProcessor = TranscriptProcessor(openai_key, "youtube", results['youtube'])
+        transcriptProcessor.process_transcripts()
+        logger.info("Finished transcript processing for YouTube results")
 
     time_since = time.time() - start_time
-    
-    print(f"Time since start: {time_since} seconds")
+    logger.info(f"Time since start: {time_since} seconds")

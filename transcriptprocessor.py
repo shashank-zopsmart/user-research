@@ -42,15 +42,13 @@ class TranscriptProcessor:
 
                 try:
                     analysis = self.analyze_transcript_in_batches(transcript)
+                    self.save_response(raw_file, analysis)
+                    self.processed_transcripts.append(f"{self.transcript_source}-{raw_file}")
+
+                    print(f"Transcript analysis complete for {raw_file}. Check processed-transcripts directory for the results.")
                 except Exception as e:
                     print(f"An error occurred during transcript analysis for file {raw_file}: {e}")
                     continue
-
-                self.save_response(raw_file, analysis)
-                self.processed_transcripts.append(f"{self.transcript_source}-{raw_file}")
-
-                print(
-                    f"Transcript analysis complete for {raw_file}. Check processed-transcripts directory for the results.")
             except Exception as e:
                 print(f"An unexpected error occurred during processing file {raw_file}: {e}")
 
@@ -91,7 +89,7 @@ class TranscriptProcessor:
             return response.choices[0].message.content
         except OpenAIError as e:
             print(f"An error occurred with the OpenAI API: {e}")
-            return None
+            raise e
 
     def combine_responses(self, responses):
         combined_data = {

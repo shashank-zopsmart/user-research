@@ -1,3 +1,5 @@
+import json
+import os
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
@@ -6,9 +8,10 @@ from scraperadapter import ScraperAdapter
 
 
 class YouTubeAdapter(ScraperAdapter):
-    def __init__(self, api_key):
+    def __init__(self, api_key, threshold_criteria=None):
         self.youtube = build("youtube", "v3", developerKey=api_key)
-        # self.raw_files = getfilelist('./raw/youtube/')
+        self.scraped_videos = os.listdir('./raw/youtube/')
+        self.threshold_criteria = threshold_criteria
 
     @sleep_and_retry
     @limits(calls=100, period=100)
@@ -29,7 +32,7 @@ class YouTubeAdapter(ScraperAdapter):
                 for item in search_response.get('items', []):
                     video_id = item['id']['videoId']
 
-                    if self.isalreadypresent(video_id):
+                    if f'{video_id}.json' in self.scraped_videos:
                         continue
 
                     video_info = self.youtube.videos().list(
@@ -37,17 +40,26 @@ class YouTubeAdapter(ScraperAdapter):
                         id=video_id
                     ).execute()['items'][0]
 
+                    if self.threshold_criteria and not self.threshold_criteria(video_info):
+                        continue
+
                     transcript = self.get_transcript(video_id)
                     comments = self.get_comments(video_id)
 
-                    videos.append({
+                    video_data = {
                         'video_id': video_id,
                         'title': video_info['snippet']['title'],
                         'description': video_info['snippet']['description'],
                         'channel': video_info['snippet']['channelTitle'],
+                        'likes': video_info['statistics'].get('likeCount', 0),
+                        'views': video_info['statistics'].get('viewCount', 0),
                         'comments': comments,
                         'transcript': transcript
-                    })
+                    }
+
+                    self.save_response(video_id, video_data)
+                    self.scraped_videos.append(f'{video_id}.json')
+                    videos.append(video_data)
 
                 next_page_token = search_response.get('nextPageToken')
                 if not next_page_token:
@@ -56,23 +68,26 @@ class YouTubeAdapter(ScraperAdapter):
             except HttpError as e:
                 print(f"An HTTP error {e.resp.status} occurred: {e.content}")
                 break
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
+                break
 
-            return videos
+        return self.scraped_videos
 
-    def get_transcript(self, videoID):
+    def get_transcript(self, video_id):
         transcript = []
 
         try:
-            transcripts = YouTubeTranscriptApi.get_transcript(videoID)
+            transcripts = YouTubeTranscriptApi.get_transcript(video_id)
 
             for entry in transcripts:
                 transcript.append(entry)
 
         except (NoTranscriptFound, TranscriptsDisabled):
-            transcript = 'No transcript in en'
+            transcript = 'No transcript available'
 
         except Exception as e:
-            print(f"failed to fetch transcript for {videoID}: {e}")
+            print(f"Failed to fetch transcript for {video_id}: {e}")
 
         return transcript
 
@@ -95,14 +110,20 @@ class YouTubeAdapter(ScraperAdapter):
 
         except HttpError as e:
             print(f"An HTTP error {e.resp.status} occurred while fetching comments: {e.content}")
+        except Exception as e:
+            print(f"An unexpected error occurred while fetching comments: {e}")
 
         return comments
 
-    def isalreadypresent(self, video_id):
-        if f'{video_id}.json' in self.raw_files:
-            return True
-
-        return False
-
-    def dumprawdata(self, videos):
-        pass
+    def save_response(self, video_id, data):
+        filename = f'./raw/youtube/{video_id}.json'
+        try:
+            with open(filename, 'w') as f:
+                f.write(json.dumps(data, indent=4))
+            print(f'Data has been successfully written to {filename}')
+        except IOError as e:
+            print(f'An I/O error occurred while writing the file: {e}')
+        except json.JSONDecodeError as e:
+            print(f'An error occurred while encoding JSON: {e}')
+        except Exception as e:
+            print(f'An unexpected error occurred: {e}')
