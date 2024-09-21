@@ -1,0 +1,8 @@
+.idea
+.local.env
+raw/reddit/*
+raw/g2/*
+raw/twitter/*
+raw/youtube/*
+processed-transcripts/*
+*.json
