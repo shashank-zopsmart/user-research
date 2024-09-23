@@ -9,9 +9,10 @@ from loguru import logger
 
 
 class YouTubeAdapter(ScraperAdapter):
-    def __init__(self, api_key, threshold_criteria=None):
+    def __init__(self, api_key, downloader, threshold_criteria=None):
         self.youtube = build("youtube", "v3", developerKey=api_key)
         self.scraped_videos = os.listdir('./raw/youtube/')
+        self.downloader = downloader
         self.threshold_criteria = threshold_criteria
 
     @sleep_and_retry
@@ -60,6 +61,9 @@ class YouTubeAdapter(ScraperAdapter):
 
                     self.save_response(video_id, video_data)
                     self.scraped_videos.append(f'{video_id}.json')
+
+                    if self.downloader:
+                        self.downloader.fetch_audio(video_id)
                     videos.append(video_data)
 
                 next_page_token = search_response.get('nextPageToken')

@@ -47,7 +47,7 @@ class TranscriptProcessor:
         self.openai_client = OpenAI(api_key=openai_api_key)
         self.transcript_source = transcript_source
         self.raw_files = raw_files
-        self.processed_transcripts = os.listdir('./processed-transcripts/')
+        self.processed_transcripts = os.listdir('./processed-transcripts/json')
 
     def process_transcripts(self):
         for raw_file in self.raw_files:
@@ -138,7 +138,7 @@ class TranscriptProcessor:
         return combined_data
 
     def save_response(self, filename, data):
-        filename = f'./processed-transcripts/{self.transcript_source}-{filename}'
+        filename = f'./processed-transcripts/json/{self.transcript_source}-{filename}'
         try:
             with open(filename, 'w') as f:
                 f.write(json.dumps(data, indent=4, default=lambda o: o.dict() if hasattr(o, 'dict') else str(o)))

@@ -6,6 +6,9 @@ from distutils.log import fatal
 
 from dotenv import load_dotenv
 from loguru import logger
+
+from json_to_csv import json_to_csv
+from youtubeaudiodownloader import YouTubeAudioDownloader
 from g2adapter import G2Adapter
 from redditadapter import RedditAdapter
 from twitteradapter import TwitterAdapter
@@ -48,6 +51,8 @@ def add_adapters(app_configs, scraper, sources):
 
     for source in sources:
         if source == 'youtube':
+            downloader = YouTubeAudioDownloader('./audio_files')
+            app_configs[source]['downloader'] = downloader
             scraper.add_adapter('youtube', YouTubeAdapter(**app_configs[source]))
         elif source == 'reddit':
             scraper.add_adapter('reddit', RedditAdapter(**app_configs[source]))
@@ -82,7 +87,7 @@ class MultiSourceScraper:
 
 def main():
     parser = argparse.ArgumentParser(description="Multi-source scraper and transcript processor")
-    parser.add_argument('action', choices=['scrape', 'process-transcript'], help="Action to perform")
+    parser.add_argument('action', choices=['scrape', 'process-transcript', 'json_to_csv'], help="Action to perform")
     parser.add_argument('--scrape_sources', type=str, help="Source of scrape")
     parser.add_argument('--transcript_source', choices=['youtube'], required=False, help="Source of transcript")
     parser.add_argument('--query', type=str, help="Search query")
@@ -132,6 +137,9 @@ def main():
 
         time_since = time.time() - start_time
         logger.info(f"Time since start: {time_since} seconds")
+
+    elif args.action == 'json_to_csv':
+        json_to_csv()
 
 
 if __name__ == '__main__':
