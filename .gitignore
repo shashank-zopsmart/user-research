@@ -6,3 +6,4 @@ raw/twitter/*
 raw/youtube/*
 processed-transcripts/*
 *.json
+input/*
