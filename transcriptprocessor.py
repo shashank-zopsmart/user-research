@@ -2,6 +2,7 @@ import json
 import os
 from openai import OpenAI, OpenAIError
 from loguru import logger
+from typing import List, Dict, Any
 
 from models import *
 
@@ -17,22 +18,28 @@ class TranscriptProcessor:
         }
 
     def process_transcripts(self):
+        logger.info(f"Starting transcript processing for source: {self.transcript_source}")
         for raw_file in self.raw_files:
             if f"{self.transcript_source}-{raw_file}" in self.processed_transcripts:
+                logger.info(f"Skipping already processed transcript: {raw_file}")
                 continue
 
             filepath = f"./raw/{self.transcript_source}/{raw_file}"
             try:
                 with open(filepath, 'r') as file:
                     transcript = file.read()
+                logger.info(f"Transcript read successfully from file: {raw_file}")
+
                 analysis_result = self.analyze_transcript(transcript, raw_file)
                 self.save_response(raw_file, analysis_result)
+
                 logger.info(
                     f"Transcript analysis complete for {raw_file}. Check processed-transcripts directory for the results.")
             except (FileNotFoundError, IOError, OpenAIError, Exception) as e:
                 logger.exception(f"An error occurred while processing file {raw_file}: {e}")
 
     def analyze_transcript(self, transcript: str, raw_file: str) -> Dict[str, Any]:
+        logger.info(f"Analyzing transcript: {raw_file}")
         segments = self.segment_transcript(transcript, raw_file)
         codes = self.open_coding(segments, raw_file)
         clusters = self.clustering_and_thematic_analysis(codes, raw_file)
@@ -42,22 +49,25 @@ class TranscriptProcessor:
 
     def segment_transcript(self, transcript: str, raw_file: str) -> List[Dict[str, Any]]:
         """Step 1: Familiarization and Segmentation"""
-        # Send prompt 1 to API
+        logger.info(f"Segmenting transcript: {raw_file}")
         messages = [
             {"role": "system",
              "content": "You are a qualitative research expert. Please read the transcript and divide it into meaningful segments based on changes in topic, speaker, or activity. Give response in JSON."},
             {"role": "user", "content": transcript}
         ]
         response = self._api_call(messages)
+
         segments = json.loads(response.choices[0].message.content)
         segments['id'] = raw_file.split(".")[0]
         segments['source'] = self.transcript_source
         segments['url'] = self.urls[self.transcript_source].format(raw_file.split(".")[0])
+
         self.save_response(raw_file, segments, "segment_transcript")
         return segments
 
     def open_coding(self, segments: List[Dict[str, Any]], raw_file: str) -> List[Dict[str, Any]]:
         """Step 2: Open Coding"""
+        logger.info(f"Open coding for segmented transcript: {raw_file}")
         codes = []
         for segment in segments['segments']:
             messages = [
@@ -77,6 +87,7 @@ class TranscriptProcessor:
 
     def clustering_and_thematic_analysis(self, codes: List[Dict[str, Any]], raw_file: str) -> List[Dict[str, Any]]:
         """Step 3: Clustering Codes and Thematic Analysis"""
+        logger.info(f"Clustering and thematic analysis for coded transcript: {raw_file}")
         messages = [
             {"role": "system",
              "content": "You are a qualitative research expert. Group similar or related codes together to form clusters and identify overarching themes. Give response in JSON."},
@@ -87,10 +98,13 @@ class TranscriptProcessor:
         clusters['id'] = raw_file.split(".")[0]
         clusters['source'] = self.transcript_source
         clusters['url'] = self.urls[self.transcript_source].format(raw_file.split(".")[0])
+
         self.save_response(raw_file, clusters, "clustering_and_thematic_analysis")
         return clusters
 
-    def affinity_mapping_and_persona_development(self, clusters: List[Dict[str, Any]], raw_file: str) -> List[Dict[str, Any]]:
+    def affinity_mapping_and_persona_development(self, clusters: List[Dict[str, Any]], raw_file: str) -> List[
+        Dict[str, Any]]:
+        logger.info(f"Affinity mapping and persona development for clustered transcript: {raw_file}")
         messages = [
             {"role": "system",
              "content": "You are a qualitative research expert. Using the identified themes, create an affinity map and develop user personas. Give response in JSON."},
@@ -101,10 +115,13 @@ class TranscriptProcessor:
         personas['id'] = raw_file.split(".")[0]
         personas['source'] = self.transcript_source
         personas['url'] = self.urls[self.transcript_source].format(raw_file.split(".")[0])
+
         self.save_response(raw_file, personas, "affinity_mapping_and_persona_development")
         return personas
 
-    def validate_and_document(self, personas: List[Dict[str, Any]], clusters: List[Dict[str, Any]], raw_file: str) -> Dict[str, Any]:
+    def validate_and_document(self, personas: List[Dict[str, Any]], clusters: List[Dict[str, Any]], raw_file: str) -> \
+    Dict[str, Any]:
+        logger.info(f"Validation and documentation for transcript: {raw_file}")
         messages = [
             {"role": "system",
              "content": "You are a qualitative research expert. Review the personas and themes to ensure they accurately reflect the data and context of the transcript. Give response in JSON."},
@@ -115,12 +132,14 @@ class TranscriptProcessor:
         validated_data['id'] = raw_file.split(".")[0]
         validated_data['source'] = self.transcript_source
         validated_data['url'] = self.urls[self.transcript_source].format(raw_file.split(".")[0])
+
         self.save_response(raw_file, validated_data, "validate_and_document")
         return validated_data
 
     def _api_call(self, messages: List[Dict[str, Any]], response_format=None) -> Dict[str, Any]:
         try:
-            response_format = { "type": "json_object" } if response_format == None else response_format
+            logger.debug(f"Sending API call with messages: {messages}")
+            response_format = {"type": "json_object"} if response_format == None else response_format
             response = self.openai_client.beta.chat.completions.parse(
                 model="gpt-4o-mini-2024-07-18",
                 messages=messages,
@@ -128,6 +147,7 @@ class TranscriptProcessor:
                 temperature=0.5,
                 response_format=response_format,
             )
+            logger.debug(f"Received API response: {response}")
             return response
         except OpenAIError as e:
             logger.exception(f"An error occurred with the OpenAI API: {e}")
@@ -135,10 +155,9 @@ class TranscriptProcessor:
 
     def save_response(self, filename: str, data: Dict[str, Any], step: str = None):
         filepath = f'./processed-transcripts/json/' if step is None else f'./processed-transcripts/json/{step}/'
-
         os.makedirs(filepath, exist_ok=True)
-
         filename = f'{filepath}/{self.transcript_source}-{filename}'
+
         try:
             with open(filename, 'w+') as f:
                 f.write(json.dumps(data, indent=4, default=lambda o: o.dict() if hasattr(o, 'dict') else str(o)))
