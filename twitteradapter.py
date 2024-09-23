@@ -1,25 +1,23 @@
 import json
 import os
+
 from ratelimit import limits, sleep_and_retry
-import tweepy
-from scraperadapter import ScraperAdapter
+from twikit import Client
 
-
-class TwitterAdapter(ScraperAdapter):
-    def __init__(self, api_key, api_secret, access_token, access_token_secret, threshold_criteria=None):
-        auth = tweepy.OAuthHandler(api_key, api_secret)
-        auth.set_access_token(access_token, access_token_secret)
-        self.api = tweepy.API(auth, wait_on_rate_limit=True)
+class TwitterAdapter:
+    def __init__(self, auth_info, language='en-US', threshold_criteria=None):
+        self.client = Client(language)
+        self.auth_info = auth_info
         self.scraped_tweets = os.listdir('./raw/twitter/')
         self.threshold_criteria = threshold_criteria
 
-    @sleep_and_retry
-    @limits(calls=450, period=900)
-    def scrape(self, query, max_results=100):
+    async def scrape(self, query, max_results=100):
+        results = []
         try:
-            for tweet in tweepy.Cursor(self.api.search_tweets, q=query, tweet_mode='extended').items(max_results):
-                tweet_id = tweet.id_str
-                if f'{tweet_id}.json' in self.scraped_tweets:
+            await self.client.login(**self.auth_info)
+            tweets = await self.client.search_tweet(query=query, max_results=max_results)
+            for tweet in tweets:
+                if f'{tweet["id"]}.json' in self.scraped_tweets:
                     continue
 
                 if self.threshold_criteria is not None:
@@ -27,32 +25,25 @@ class TwitterAdapter(ScraperAdapter):
                         continue
 
                 tweet_data = {
-                    'full_text': tweet.full_text,
-                    'author': {
-                        'name': tweet.user.name,
-                        'screen_name': tweet.user.screen_name
+                    'body': tweet['full_text'],
+                    'likes': tweet['favorite_count'],
+                    'retweets': tweet['retweet_count'],
+                    'user_info': {
+                        'username': tweet['user']['screen_name'],
+                        'followers_count': tweet['user']['followers_count'],
+                        'following_count': tweet['user']['friends_count']
                     },
-                    'likes': tweet.favorite_count,
-                    'retweets': tweet.retweet_count,
-                    'comments': self.get_comments(tweet_id),
-                    'comment_count': tweet.reply_count  # Assuming this is how replies are counted
+                    'tweet_id': tweet['id']
                 }
 
-                self.save_response(tweet_id, tweet_data)
-                self.scraped_tweets.append(f'{tweet_id}.json')
-        except tweepy.TweepError as e:
-            print(f'An error occurred with Twitter API: {e}')
-        except Exception as e:
-            print(f'An unexpected error occurred: {e}')
-        finally:
-            return self.scraped_tweets
+                self.save_response(tweet['id'], tweet_data)
+                self.scraped_tweets.append(f'{tweet["id"]}.json')
 
-    @staticmethod
-    def get_comments(tweet_id):
-        # Placeholder method to get comments. Implementation could vary.
-        # NOTE: Twitter API v1.1 doesn't provide an easy way to get comments.
-        # In a real-world scenario, you might need to use Twitter API v2 or a different method.
-        return []
+                results.append(tweet_data)
+
+        except Exception as e:
+            print(f'Error during scraping: {e}')
+        return results
 
     @staticmethod
     def save_response(tweet_id, data):

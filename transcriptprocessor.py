@@ -2,6 +2,7 @@ import json
 from pydantic import BaseModel, ValidationError
 import os
 from openai import OpenAI, OpenAIError
+from loguru import logger
 
 
 class QuoteSchema(BaseModel):
@@ -34,10 +35,10 @@ class TranscriptProcessor:
                     with open(filepath, 'r') as file:
                         transcript = file.read()
                 except FileNotFoundError:
-                    print(f"The file {filepath} was not found.")
+                    logger.warning(f"The file {filepath} was not found.")
                     continue
                 except IOError as e:
-                    print(f"An I/O error occurred while reading the file {filepath}: {e}")
+                    logger.error(f"An I/O error occurred while reading the file {filepath}: {e}")
                     continue
 
                 try:
@@ -45,12 +46,13 @@ class TranscriptProcessor:
                     self.save_response(raw_file, analysis)
                     self.processed_transcripts.append(f"{self.transcript_source}-{raw_file}")
 
-                    print(f"Transcript analysis complete for {raw_file}. Check processed-transcripts directory for the results.")
+                    logger.info(
+                        f"Transcript analysis complete for {raw_file}. Check processed-transcripts directory for the results.")
                 except Exception as e:
-                    print(f"An error occurred during transcript analysis for file {raw_file}: {e}")
+                    logger.error(f"An error occurred during transcript analysis for file {raw_file}: {e}")
                     continue
             except Exception as e:
-                print(f"An unexpected error occurred during processing file {raw_file}: {e}")
+                logger.error(f"An unexpected error occurred during processing file {raw_file}: {e}")
 
     def analyze_transcript_in_batches(self, transcript):
         tokens = transcript.split()
@@ -66,7 +68,7 @@ class TranscriptProcessor:
                 if response:
                     responses.append(response)
             except OpenAIError as e:
-                print(f"An error occurred during the API call: {e}")
+                logger.error(f"An error occurred during the API call: {e}")
                 continue
 
         combined_response = self.combine_responses(responses)
@@ -80,7 +82,7 @@ class TranscriptProcessor:
                 {"role": "user", "content": f"Here is the transcript: {transcript}"}
             ]
             response = self.openai_client.beta.chat.completions.parse(
-                model="gpt-4o-2024-08-06",
+                model="gpt-4o-mini-2024-07-18",
                 messages=messages,
                 max_tokens=10000,
                 temperature=0.5,
@@ -88,7 +90,7 @@ class TranscriptProcessor:
             )
             return response.choices[0].message.content
         except OpenAIError as e:
-            print(f"An error occurred with the OpenAI API: {e}")
+            logger.error(f"An error occurred with the OpenAI API: {e}")
             raise e
 
     def combine_responses(self, responses):
@@ -106,7 +108,7 @@ class TranscriptProcessor:
                 combined_data['quotes'].extend(analysis_data.quotes)
 
             except (json.JSONDecodeError, ValidationError) as e:
-                print(f"An error occurred while parsing the response: {e}")
+                logger.error(f"An error occurred while parsing the response: {e}")
 
         return combined_data
 
@@ -115,10 +117,10 @@ class TranscriptProcessor:
         try:
             with open(filename, 'w') as f:
                 f.write(json.dumps(data, indent=4))
-            print(f'Data has been successfully written to {filename}')
+            logger.info(f'Data has been successfully written to {filename}')
         except IOError as e:
-            print(f'An I/O error occurred while writing the file: {e}')
+            logger.error(f'An I/O error occurred while writing the file: {e}')
         except json.JSONDecodeError as e:
-            print(f'An error occurred while encoding JSON: {e}')
+            logger.error(f'An error occurred while encoding JSON: {e}')
         except Exception as e:
-            print(f'An unexpected error occurred: {e}')
+            logger.error(f'An unexpected error occurred: {e}')

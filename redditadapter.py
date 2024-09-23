@@ -5,6 +5,7 @@ from ratelimit import limits, sleep_and_retry
 import praw
 from prawcore.exceptions import PrawcoreException
 from scraperadapter import ScraperAdapter
+from loguru import logger
 
 
 class RedditAdapter(ScraperAdapter):
@@ -43,9 +44,11 @@ class RedditAdapter(ScraperAdapter):
                 self.save_response(submission.id, post)
                 self.scraped_posts.append(f'{submission.id}.json')
         except PrawcoreException as e:
-            print(f'An error occurred with Reddit API: {e}')
+            logger.error(f'An error occurred with Reddit API: {e}')
         except Exception as e:
-            print(f'An unexpected error occurred: {e}')
+            logger.error(f'An unexpected error occurred: {e}')
+        else:
+            logger.info('Scraping completed successfully.')
         finally:
             return self.scraped_posts
 
@@ -54,11 +57,11 @@ class RedditAdapter(ScraperAdapter):
         filename = f'./raw/reddit/{post_id}.json'
         try:
             with open(filename, 'w') as f:
-                f.write(json.dumps(data, indent=4))
-            print(f'Data has been successfully written to {filename}')
+                json.dump(data, f, indent=4)
+            logger.info(f'Data has been successfully written to {filename}')
         except IOError as e:
-            print(f'An I/O error occurred while writing the file: {e}')
+            logger.error(f'An I/O error occurred while writing the file: {e}')
         except json.JSONDecodeError as e:
-            print(f'An error occurred while encoding JSON: {e}')
+            logger.error(f'An error occurred while encoding JSON: {e}')
         except Exception as e:
-            print(f'An unexpected error occurred: {e}')
+            logger.error(f'An unexpected error occurred: {e}')

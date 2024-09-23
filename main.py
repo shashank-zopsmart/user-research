@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import asyncio
 import argparse
 from dotenv import load_dotenv
 from loguru import logger
@@ -59,16 +60,18 @@ if __name__ == '__main__':
     }
 
     twitterConfigs = {
-        "api_key": configs.get("TWITTER_API_KEY"),
-        "api_secret": configs.get("TWITTER_API_SECRET"),
-        "access_token": configs.get("TWITTER_ACCESS_TOKEN"),
-        "access_token_secret": configs.get("TWITTER_ACCESS_TOKEN_SECRET"),
+        "auth_info": {
+            "auth_info_1": configs.get("TWITTER_AUTH_INFO_1"),
+            "auth_info_2": configs.get("TWITTER_AUTH_INFO_2"),
+            "password": configs.get("TWITTER_AUTH_INFO_PASSWORD"),
+        },
+        "language": "en-US",
         "threshold_criteria": None,
     }
 
     scraper = MultiSourceScraper()
-    scraper.add_adapter('reddit', RedditAdapter(**redditConfigs))
-    scraper.add_adapter('twitter', TwitterAdapter(**twitterConfigs))
+    # scraper.add_adapter('reddit', RedditAdapter(**redditConfigs))
+    # scraper.add_adapter('twitter', TwitterAdapter(**twitterConfigs))
     # scraper.add_adapter('g2', G2Adapter())
     scraper.add_adapter('youtube', YouTubeAdapter(**youtubeConfigs))
 

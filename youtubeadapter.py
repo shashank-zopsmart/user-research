@@ -5,6 +5,7 @@ from googleapiclient.errors import HttpError
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
 from ratelimit import limits, sleep_and_retry
 from scraperadapter import ScraperAdapter
+from loguru import logger
 
 
 class YouTubeAdapter(ScraperAdapter):
@@ -66,12 +67,13 @@ class YouTubeAdapter(ScraperAdapter):
                     break
 
             except HttpError as e:
-                print(f"An HTTP error {e.resp.status} occurred: {e.content}")
+                logger.error(f"An HTTP error {e.resp.status} occurred: {e.content}")
                 break
             except Exception as e:
-                print(f"An unexpected error occurred: {e}")
+                logger.error(f"An unexpected error occurred: {e}")
                 break
 
+        logger.info('Scraping completed successfully.')
         return self.scraped_videos
 
     def get_transcript(self, video_id):
@@ -85,9 +87,10 @@ class YouTubeAdapter(ScraperAdapter):
 
         except (NoTranscriptFound, TranscriptsDisabled):
             transcript = 'No transcript available'
+            logger.warning(f"No transcript available for video {video_id}")
 
         except Exception as e:
-            print(f"Failed to fetch transcript for {video_id}: {e}")
+            logger.error(f"Failed to fetch transcript for {video_id}: {e}")
 
         return transcript
 
@@ -109,9 +112,9 @@ class YouTubeAdapter(ScraperAdapter):
                 })
 
         except HttpError as e:
-            print(f"An HTTP error {e.resp.status} occurred while fetching comments: {e.content}")
+            logger.error(f"An HTTP error {e.resp.status} occurred while fetching comments: {e.content}")
         except Exception as e:
-            print(f"An unexpected error occurred while fetching comments: {e}")
+            logger.error(f"An unexpected error occurred while fetching comments: {e}")
 
         return comments
 
@@ -119,11 +122,11 @@ class YouTubeAdapter(ScraperAdapter):
         filename = f'./raw/youtube/{video_id}.json'
         try:
             with open(filename, 'w') as f:
-                f.write(json.dumps(data, indent=4))
-            print(f'Data has been successfully written to {filename}')
+                json.dump(data, f, indent=4)
+            logger.info(f'Data has been successfully written to {filename}')
         except IOError as e:
-            print(f'An I/O error occurred while writing the file: {e}')
+            logger.error(f'An I/O error occurred while writing the file: {e}')
         except json.JSONDecodeError as e:
-            print(f'An error occurred while encoding JSON: {e}')
+            logger.error(f'An error occurred while encoding JSON: {e}')
         except Exception as e:
-            print(f'An unexpected error occurred: {e}')
+            logger.error(f'An unexpected error occurred: {e}')
