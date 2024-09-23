@@ -108,8 +108,7 @@ def main():
 
     if args.action == 'scrape':
         if not args.query:
-            logger.exception("The --query argument is required for scraping")
-            return
+            args.query = input("search query: ")
 
         if not args.scrape_sources:
             logger.exception("The --scrape_sources argument is required for scraping")

@@ -10,6 +10,7 @@ class QuoteSchema(BaseModel):
     quote: str
     code: str
     keywords: List[str]
+    context: str
 
     def __dir__(self):
         return self.model_dump()
@@ -102,7 +103,7 @@ class TranscriptProcessor:
         try:
             messages = [
                 {"role": "system",
-                 "content": "You are a qualitative research expert. Extract key phrases, quotes, keywords, and group them into suitable themes with codes."},
+                 "content": "You are a qualitative research expert with a focus on developer and devops productivity. Extract key phrases, quotes, keywords, context, and group them into suitable themes with codes."},
                 {"role": "user", "content": f"Here is the transcript: {transcript}"}
             ]
             response = self.openai_client.beta.chat.completions.parse(
