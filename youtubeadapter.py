@@ -67,10 +67,10 @@ class YouTubeAdapter(ScraperAdapter):
                     break
 
             except HttpError as e:
-                logger.error(f"An HTTP error {e.resp.status} occurred: {e.content}")
+                logger.exception(f"An HTTP error {e.resp.status} occurred: {e.content}")
                 break
             except Exception as e:
-                logger.error(f"An unexpected error occurred: {e}")
+                logger.exception(f"An unexpected error occurred: {e}")
                 break
 
         logger.info('Scraping completed successfully.')
@@ -90,7 +90,7 @@ class YouTubeAdapter(ScraperAdapter):
             logger.warning(f"No transcript available for video {video_id}")
 
         except Exception as e:
-            logger.error(f"Failed to fetch transcript for {video_id}: {e}")
+            logger.exception(f"Failed to fetch transcript for {video_id}: {e}")
 
         return transcript
 
@@ -112,9 +112,9 @@ class YouTubeAdapter(ScraperAdapter):
                 })
 
         except HttpError as e:
-            logger.error(f"An HTTP error {e.resp.status} occurred while fetching comments: {e.content}")
+            logger.exception(f"An HTTP error {e.resp.status} occurred while fetching comments: {e.content}")
         except Exception as e:
-            logger.error(f"An unexpected error occurred while fetching comments: {e}")
+            logger.exception(f"An unexpected error occurred while fetching comments: {e}")
 
         return comments
 
@@ -125,8 +125,8 @@ class YouTubeAdapter(ScraperAdapter):
                 json.dump(data, f, indent=4)
             logger.info(f'Data has been successfully written to {filename}')
         except IOError as e:
-            logger.error(f'An I/O error occurred while writing the file: {e}')
+            logger.exception(f'An I/O error occurred while writing the file: {e}')
         except json.JSONDecodeError as e:
-            logger.error(f'An error occurred while encoding JSON: {e}')
+            logger.exception(f'An error occurred while encoding JSON: {e}')
         except Exception as e:
-            logger.error(f'An unexpected error occurred: {e}')
+            logger.exception(f'An unexpected error occurred: {e}')

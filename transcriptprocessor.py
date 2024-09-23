@@ -1,5 +1,6 @@
 import json
 from pydantic import BaseModel, ValidationError
+from typing import List
 import os
 from openai import OpenAI, OpenAIError
 from loguru import logger
@@ -8,13 +9,37 @@ from loguru import logger
 class QuoteSchema(BaseModel):
     quote: str
     code: str
-    keywords: list[str]
+    keywords: List[str]
+
+    def __dir__(self):
+        return self.model_dump()
+
+    def __json__(self):
+        return self.model_dump_json()
+
+    def to_json(self):
+        return self.model_dump_json()
+
+    def to_dict(self):
+        return self.model_dump()
 
 
 class AnalysisSchema(BaseModel):
-    codes: list[str]
-    keywords: list[str]
-    quotes: list[QuoteSchema]
+    codes: List[str]
+    keywords: List[str]
+    quotes: List[QuoteSchema]
+
+    def __dir__(self):
+        return self.model_dump()
+
+    def __json__(self):
+        return self.model_dump_json()
+
+    def to_json(self):
+        return self.model_dump_json()
+
+    def to_dict(self):
+        return self.model_dump()
 
 
 class TranscriptProcessor:
@@ -38,21 +63,20 @@ class TranscriptProcessor:
                     logger.warning(f"The file {filepath} was not found.")
                     continue
                 except IOError as e:
-                    logger.error(f"An I/O error occurred while reading the file {filepath}: {e}")
+                    logger.exception(f"An I/O error occurred while reading the file {filepath}: {e}")
                     continue
 
                 try:
                     analysis = self.analyze_transcript_in_batches(transcript)
                     self.save_response(raw_file, analysis)
                     self.processed_transcripts.append(f"{self.transcript_source}-{raw_file}")
-
                     logger.info(
                         f"Transcript analysis complete for {raw_file}. Check processed-transcripts directory for the results.")
                 except Exception as e:
-                    logger.error(f"An error occurred during transcript analysis for file {raw_file}: {e}")
+                    logger.exception(f"An error occurred during transcript analysis for file {raw_file}: {e}")
                     continue
             except Exception as e:
-                logger.error(f"An unexpected error occurred during processing file {raw_file}: {e}")
+                logger.exception(f"An unexpected error occurred during processing file {raw_file}: {e}")
 
     def analyze_transcript_in_batches(self, transcript):
         tokens = transcript.split()
@@ -68,7 +92,7 @@ class TranscriptProcessor:
                 if response:
                     responses.append(response)
             except OpenAIError as e:
-                logger.error(f"An error occurred during the API call: {e}")
+                logger.exception(f"An error occurred during the API call: {e}")
                 continue
 
         combined_response = self.combine_responses(responses)
@@ -88,9 +112,10 @@ class TranscriptProcessor:
                 temperature=0.5,
                 response_format=AnalysisSchema,
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            return AnalysisSchema(**json.loads(content))
         except OpenAIError as e:
-            logger.error(f"An error occurred with the OpenAI API: {e}")
+            logger.exception(f"An error occurred with the OpenAI API: {e}")
             raise e
 
     def combine_responses(self, responses):
@@ -101,14 +126,14 @@ class TranscriptProcessor:
         }
         for response in responses:
             try:
-                analysis_data = AnalysisSchema(**json.loads(response))
+                analysis_data = response  # This is already an AnalysisSchema instance
 
                 combined_data['codes'].extend(analysis_data.codes)
                 combined_data['keywords'].extend(analysis_data.keywords)
                 combined_data['quotes'].extend(analysis_data.quotes)
 
             except (json.JSONDecodeError, ValidationError) as e:
-                logger.error(f"An error occurred while parsing the response: {e}")
+                logger.exception(f"An error occurred while parsing the response: {e}")
 
         return combined_data
 
@@ -116,11 +141,11 @@ class TranscriptProcessor:
         filename = f'./processed-transcripts/{self.transcript_source}-{filename}'
         try:
             with open(filename, 'w') as f:
-                f.write(json.dumps(data, indent=4))
+                f.write(json.dumps(data, indent=4, default=lambda o: o.dict() if hasattr(o, 'dict') else str(o)))
             logger.info(f'Data has been successfully written to {filename}')
         except IOError as e:
-            logger.error(f'An I/O error occurred while writing the file: {e}')
+            logger.exception(f'An I/O error occurred while writing the file: {e}')
         except json.JSONDecodeError as e:
-            logger.error(f'An error occurred while encoding JSON: {e}')
+            logger.exception(f'An error occurred while encoding JSON: {e}')
         except Exception as e:
-            logger.error(f'An unexpected error occurred: {e}')
+            logger.exception(f'An unexpected error occurred: {e}')

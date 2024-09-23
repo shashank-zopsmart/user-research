@@ -44,9 +44,9 @@ class RedditAdapter(ScraperAdapter):
                 self.save_response(submission.id, post)
                 self.scraped_posts.append(f'{submission.id}.json')
         except PrawcoreException as e:
-            logger.error(f'An error occurred with Reddit API: {e}')
+            logger.exception(f'An error occurred with Reddit API: {e}')
         except Exception as e:
-            logger.error(f'An unexpected error occurred: {e}')
+            logger.exception(f'An unexpected error occurred: {e}')
         else:
             logger.info('Scraping completed successfully.')
         finally:
@@ -60,8 +60,8 @@ class RedditAdapter(ScraperAdapter):
                 json.dump(data, f, indent=4)
             logger.info(f'Data has been successfully written to {filename}')
         except IOError as e:
-            logger.error(f'An I/O error occurred while writing the file: {e}')
+            logger.exception(f'An I/O error occurred while writing the file: {e}')
         except json.JSONDecodeError as e:
-            logger.error(f'An error occurred while encoding JSON: {e}')
+            logger.exception(f'An error occurred while encoding JSON: {e}')
         except Exception as e:
-            logger.error(f'An unexpected error occurred: {e}')
+            logger.exception(f'An unexpected error occurred: {e}')
